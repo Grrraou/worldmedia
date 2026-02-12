@@ -427,18 +427,31 @@ function isHlsUrl(url) {
  */
 function openPlayerModal(channel) {
   const modal = document.getElementById("player-modal");
+  const errorEl = document.getElementById("player-error");
+  // Hide any previous error as soon as we open the player
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+  }
+
   const titleEl = document.getElementById("player-modal-title");
   const logoEl = document.getElementById("player-modal-logo");
   const tvWrap = document.getElementById("player-tv-wrap");
   const radioWrap = document.getElementById("player-radio-wrap");
+  const youtubeWrap = document.getElementById("player-youtube-wrap");
+  const youtubeIframe = document.getElementById("player-youtube-iframe");
+  const webcamWrap = document.getElementById("player-webcam-wrap");
+  const webcamImage = document.getElementById("player-webcam-image");
+  const webcamIframe = document.getElementById("player-webcam-iframe");
   const videoEl = document.getElementById("player-video");
   const audioEl = document.getElementById("player-audio");
-  const errorEl = document.getElementById("player-error");
   if (!modal || !titleEl || !tvWrap || !radioWrap || !videoEl || !audioEl || !errorEl) return;
 
   const url = channel.url && channel.url.trim();
   const mediaType = String(channel.type || "tv").toLowerCase();
   const isRadio = mediaType === "radio";
+  const isYoutube = mediaType === "youtube";
+  const isWebcam = mediaType === "webcam";
 
   // Stop any current playback and clear
   if (playerHls) {
@@ -451,11 +464,23 @@ function openPlayerModal(channel) {
   videoEl.load();
   audioEl.removeAttribute("src");
   audioEl.load();
-  errorEl.hidden = true;
-  errorEl.textContent = "";
 
   currentPlayerChannel = channel;
   titleEl.textContent = channel.name || "Channel";
+
+  const typeLabels = { tv: "TV", radio: "Radio", youtube: "YouTube", webcam: "Webcam" };
+  const typeLabel = typeLabels[mediaType] || "TV";
+  const desc = (channel.description && String(channel.description).trim()) || "";
+  const sourceLabel = (channel.source_name && String(channel.source_name).trim()) || (channel.source && String(channel.source).trim()) || "";
+  const seoEl = document.getElementById("player-modal-seo");
+  if (seoEl) {
+    const parts = [`Watch ${channel.name || "Channel"} — ${typeLabel} stream.`];
+    if (desc) parts.push(desc);
+    if (sourceLabel) parts.push(`Source: ${sourceLabel}.`);
+    seoEl.textContent = parts.join(" ");
+    seoEl.hidden = false;
+  }
+
   if (channel.logo) {
     logoEl.src = channel.logo;
     logoEl.alt = "";
@@ -499,8 +524,16 @@ function openPlayerModal(channel) {
     }
   }
 
-  tvWrap.hidden = isRadio;
+  tvWrap.hidden = (isRadio || isYoutube || isWebcam);
   radioWrap.hidden = !isRadio;
+  if (youtubeWrap) youtubeWrap.hidden = !isYoutube;
+  if (youtubeIframe) youtubeIframe.src = "";
+  if (webcamWrap) webcamWrap.hidden = !isWebcam;
+  if (webcamImage) webcamImage.src = "";
+  if (webcamIframe) {
+    webcamIframe.removeAttribute("src");
+    webcamIframe.hidden = true;
+  }
 
   if (!url) {
     errorEl.textContent = "No stream URL for this channel.";
@@ -510,7 +543,24 @@ function openPlayerModal(channel) {
     return;
   }
 
-  if (isRadio) {
+  if (isWebcam) {
+    const isWindyEmbed = /windy\.com/i.test(url);
+    if (isWindyEmbed && webcamIframe) {
+      webcamIframe.hidden = false;
+      webcamIframe.src = url.startsWith("http") ? url : `https://embed.windy.com/${url}`;
+      if (webcamImage) webcamImage.hidden = true;
+    } else if (webcamImage) {
+      webcamImage.hidden = false;
+      webcamImage.src = url;
+      webcamImage.onerror = () => {
+        errorEl.textContent = "Could not load webcam stream. It may be unavailable or blocked.";
+        errorEl.hidden = false;
+      };
+      if (webcamIframe) webcamIframe.hidden = true;
+    }
+  } else if (isYoutube && youtubeIframe) {
+    youtubeIframe.src = url.startsWith("http") ? url : `https://www.youtube-nocookie.com/embed/${url}`;
+  } else if (isRadio) {
     audioEl.src = url;
     audioEl.play().catch(() => {
       errorEl.textContent = "Could not play stream. It may be unavailable or blocked.";
@@ -577,6 +627,14 @@ function closePlayerModal() {
   const modal = document.getElementById("player-modal");
   const videoEl = document.getElementById("player-video");
   const audioEl = document.getElementById("player-audio");
+  const youtubeIframe = document.getElementById("player-youtube-iframe");
+  const webcamImage = document.getElementById("player-webcam-image");
+  const webcamIframe = document.getElementById("player-webcam-iframe");
+  const seoEl = document.getElementById("player-modal-seo");
+  if (seoEl) {
+    seoEl.textContent = "";
+    seoEl.hidden = true;
+  }
   if (!modal || !videoEl || !audioEl) return;
   if (playerHls) {
     playerHls.destroy();
@@ -588,6 +646,13 @@ function closePlayerModal() {
   videoEl.load();
   audioEl.removeAttribute("src");
   audioEl.load();
+  if (youtubeIframe) youtubeIframe.removeAttribute("src");
+  if (webcamImage) webcamImage.removeAttribute("src");
+  if (webcamIframe) {
+    webcamIframe.removeAttribute("src");
+    webcamIframe.hidden = true;
+  }
+  if (webcamImage) webcamImage.hidden = false;
   modal.hidden = true;
   modal.setAttribute("aria-hidden", "true");
 
@@ -603,7 +668,7 @@ function buildChannelFilterToggles(containerId, values, kind) {
   container.innerHTML = "";
   container.setAttribute("role", "radiogroup");
   container.setAttribute("aria-label", kind === "type" ? "Filter by type" : "Filter by source");
-  const typeLabels = { tv: "TV", radio: "Radio", youtube: "YouTube" };
+  const typeLabels = { tv: "TV", radio: "Radio", youtube: "YouTube", webcam: "Webcam" };
   const allValue = "";
   const options = [allValue, ...values.filter((v) => v !== allValue)];
   options.forEach((val, index) => {
@@ -697,7 +762,7 @@ function selectUnknown(onChannelsLoaded) {
 }
 
 /** Source names (parser names) — only path is data/channels/<country_code>/<sourcename>.json */
-const CHANNEL_SOURCE_NAMES = ["iptv-org", "free-tv-iptv", "iprd"];
+const CHANNEL_SOURCE_NAMES = ["iptv-org", "free-tv-iptv", "iprd", "famelack-channels", "m3u-radio-music-playlists", "insecam", "windy"];
 
 /**
  * Return list of country codes to try for loading. Always tries BOTH when we have a mapping:
@@ -725,6 +790,7 @@ async function loadChannelsForCountry(countryCode, onChannelsLoaded) {
   emptyEl.hidden = true;
   listEl.hidden = true;
   listEl.innerHTML = "";
+  emptyEl.textContent = "No channels for this country.";
 
   const codesToTry = getChannelLoadCodes(countryCode);
   const debugEl = document.getElementById("channels-debug-paths");
@@ -871,6 +937,150 @@ async function loadChannelsForCountry(countryCode, onChannelsLoaded) {
   }
 }
 
+/** Load and display channels for a category. Uses data/cat_channels/<category>/<sourcename>.json; merges and dedupes by url. */
+async function loadChannelsForCategory(categoryName, onChannelsLoaded) {
+  const loadingEl = document.getElementById("channels-loading");
+  const emptyEl = document.getElementById("channels-empty");
+  const listEl = document.getElementById("channel-list");
+  const selectedCountryEl = document.getElementById("selected-country");
+  const countryNameEl = document.getElementById("country-name");
+  const countryCodeEl = document.getElementById("country-code");
+  const countryFlagEl = document.getElementById("country-flag");
+  if (!loadingEl || !emptyEl || !listEl || !selectedCountryEl || !countryNameEl || !countryCodeEl) return;
+
+  document.querySelectorAll(".country.selected").forEach((c) => c.classList.remove("selected"));
+  selectedCountryEl.hidden = false;
+  countryNameEl.textContent = categoryName;
+  countryCodeEl.textContent = "Category";
+  if (countryFlagEl) countryFlagEl.hidden = true;
+
+  loadingEl.hidden = false;
+  emptyEl.hidden = true;
+  listEl.hidden = true;
+  listEl.innerHTML = "";
+  const debugEl = document.getElementById("channels-debug-paths");
+  if (debugEl) debugEl.hidden = true;
+  const emptyMsg = document.getElementById("channels-empty");
+  if (emptyMsg) emptyMsg.textContent = "No channels for this category.";
+
+  const paths = CHANNEL_SOURCE_NAMES.map((s) => `data/cat_channels/${encodeURIComponent(categoryName)}/${s}.json`);
+  try {
+    const allChannels = [];
+    const seenUrls = new Set();
+    for (const url of paths) {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const list = data.channels || [];
+      for (const ch of list) {
+        const u = ch.url && ch.url.trim();
+        if (u && !seenUrls.has(u)) {
+          seenUrls.add(u);
+          allChannels.push(ch);
+        } else if (!u) allChannels.push(ch);
+      }
+    }
+    const channels = allChannels;
+    loadingEl.hidden = true;
+    if (channels.length === 0) {
+      emptyEl.hidden = false;
+      return;
+    }
+    const typeSet = new Set();
+    const sourceSet = new Set();
+    for (const ch of channels) {
+      const typeNorm = String(ch.type || "tv").toLowerCase().trim();
+      const sourceNorm = (ch.source_name && String(ch.source_name).trim()) || "";
+      typeSet.add(typeNorm);
+      if (sourceNorm) sourceSet.add(sourceNorm);
+      const li = document.createElement("li");
+      li.className = "channel-item";
+      li.setAttribute("role", "button");
+      li.setAttribute("tabindex", "0");
+      li.setAttribute("aria-label", `Play ${ch.name || "Channel"}`);
+      li.setAttribute("data-type", typeNorm);
+      li.setAttribute("data-source", sourceNorm);
+      li.setAttribute("data-iso", (ch.iso || "").toUpperCase());
+      li.setAttribute("data-slug", channelSlug(ch));
+      const body = document.createElement("div");
+      body.className = "channel-item-body";
+      const nameEl = document.createElement("span");
+      nameEl.className = "channel-item-name";
+      nameEl.textContent = ch.name || "Channel";
+      const typeEl = document.createElement("span");
+      typeEl.className = "channel-item-type";
+      typeEl.textContent = ch.type || "tv";
+      body.append(nameEl, " ", typeEl);
+      if (sourceNorm || (ch.source && String(ch.source).trim())) {
+        const src = ch.source && String(ch.source).trim();
+        const text = sourceNorm || src || "";
+        const truncated = text.length > 28 ? text.slice(0, 26) + "…" : text;
+        const sourceEl = document.createElement("span");
+        sourceEl.className = "channel-item-source";
+        sourceEl.textContent = truncated;
+        if (src) sourceEl.title = src;
+        body.appendChild(document.createElement("br"));
+        body.appendChild(sourceEl);
+      }
+      if (ch.logo) {
+        const img = document.createElement("img");
+        img.className = "channel-item-logo";
+        img.src = ch.logo;
+        img.alt = "";
+        img.loading = "lazy";
+        li.appendChild(img);
+      }
+      li.appendChild(body);
+      const favBtn = document.createElement("button");
+      favBtn.type = "button";
+      favBtn.className = "channel-item-fav";
+      favBtn.setAttribute("aria-label", "Add to favorites");
+      favBtn.innerHTML = "★";
+      favBtn.title = "Add to favorites";
+      const isoUpper = (ch.iso || "").toUpperCase();
+      const chSlug = channelSlug(ch);
+      function updateFavBtn() {
+        const inFav = isChannelInFavorites(isoUpper, chSlug);
+        favBtn.classList.toggle("is-favorite", inFav);
+        favBtn.setAttribute("aria-label", inFav ? "Remove from favorites" : "Add to favorites");
+        favBtn.title = inFav ? "Remove from favorites" : "Add to favorites";
+      }
+      updateFavBtn();
+      favBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isChannelInFavorites(isoUpper, chSlug)) removeChannelFromFavorites(isoUpper, chSlug);
+        else addChannelToFavorites(ch);
+        updateFavBtn();
+      });
+      li.appendChild(favBtn);
+      li.addEventListener("click", (e) => {
+        if (e.target.closest(".channel-item-fav")) return;
+        openPlayerModal(ch);
+      });
+      li.addEventListener("keydown", (e) => {
+        if (e.target.closest(".channel-item-fav")) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openPlayerModal(ch);
+        }
+      });
+      listEl.appendChild(li);
+    }
+    refreshFavoriteStarsInList();
+    buildChannelFilterToggles("filter-type", Array.from(typeSet), "type");
+    buildChannelFilterToggles("filter-source", Array.from(sourceSet).sort(), "source");
+    const filtersEl = document.getElementById("channel-filters");
+    if (filtersEl) filtersEl.hidden = false;
+    applyChannelFilters();
+    listEl.hidden = false;
+    if (typeof onChannelsLoaded === "function") onChannelsLoaded(channels);
+  } catch {
+    loadingEl.hidden = true;
+    emptyEl.hidden = false;
+  }
+}
+
 /**
  * Pan & zoom state and apply transform to #map-pan-zoom.
  * Zoom toward cursor; supports wheel, pinch, and external setScale (e.g. zoom slider).
@@ -918,6 +1128,14 @@ function initPanZoom(opts = {}) {
     tx = (r.width - DISPLAY_WIDTH) / 2;
     ty = (r.height - DISPLAY_HEIGHT) / 2;
     scale = 1;
+    applyTransform();
+  }
+
+  /** Re-center pan (tx, ty) to keep the map centered in the viewport without resetting zoom. */
+  function recenterPanOnly() {
+    const r = viewport.getBoundingClientRect();
+    tx = (r.width - DISPLAY_WIDTH * scale) / 2;
+    ty = (r.height - DISPLAY_HEIGHT * scale) / 2;
     applyTransform();
   }
 
@@ -1043,11 +1261,58 @@ function initPanZoom(opts = {}) {
     }
   }, { passive: false });
 
-  // Re-center on resize
-  const ro = new ResizeObserver(centerMap);
+  // On resize: keep current zoom, only re-center pan so the map doesn’t jump
+  const ro = new ResizeObserver(recenterPanOnly);
   ro.observe(viewport);
 
   return { setScale, getScale };
+}
+
+/**
+ * Add SVG pattern definitions for country flags (one per iso2 with valid flag URL).
+ * Inserts into the map SVG's existing <defs>.
+ */
+function addFlagPatternsToMap(svgCountries, features) {
+  const svg = svgCountries.parentElement;
+  if (!svg || svg.tagName !== "svg") return;
+  let defs = svg.querySelector("defs");
+  if (!defs) {
+    defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    svg.insertBefore(defs, svg.firstChild);
+  }
+  const seen = new Set();
+  const iso2List = [];
+  features.forEach((f) => {
+    const rawA2 = f.properties?.ISO_A2 ?? "";
+    const rawA3 = f.properties?.ISO_A3 ?? "";
+    const name = f.properties?.NAME ?? f.properties?.ADMIN ?? "";
+    const iso2 = normalizeIso2(rawA2, rawA3, name);
+    if (iso2 && !seen.has(iso2) && getFlagUrl(iso2)) {
+      seen.add(iso2);
+      iso2List.push(iso2);
+    }
+  });
+  iso2List.forEach((iso2) => {
+    const id = "flag-" + iso2;
+    if (defs.querySelector("#" + id)) return;
+    const flagUrl = getFlagUrl(iso2, 80);
+    if (!flagUrl) return;
+    const pattern = document.createElementNS("http://www.w3.org/2000/svg", "pattern");
+    pattern.setAttribute("id", id);
+    pattern.setAttribute("patternUnits", "objectBoundingBox");
+    pattern.setAttribute("width", "1");
+    pattern.setAttribute("height", "1");
+    pattern.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+    img.setAttribute("href", flagUrl);
+    img.setAttribute("x", "0");
+    img.setAttribute("y", "0");
+    img.setAttribute("width", "1");
+    img.setAttribute("height", "1");
+    img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    pattern.appendChild(img);
+    defs.appendChild(pattern);
+  });
 }
 
 /**
@@ -1057,6 +1322,8 @@ function initPanZoom(opts = {}) {
 function renderCountries(geojson, svgCountries, selectedCountryEl, countryNameEl, countryCodeEl) {
   svgCountries.innerHTML = "";
   const features = geojson.features || [];
+
+  addFlagPatternsToMap(svgCountries, features);
 
   function selectCountry(el, toggle, onChannelsLoaded) {
     const isSelected = el.classList.contains("selected");
@@ -1101,6 +1368,11 @@ function renderCountries(geojson, svgCountries, selectedCountryEl, countryNameEl
     const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
     pathEl.setAttribute("d", path);
     pathEl.setAttribute("class", "country");
+    if (iso2 && getFlagUrl(iso2)) {
+      pathEl.setAttribute("fill", "url(#flag-" + iso2 + ")");
+    } else {
+      pathEl.setAttribute("fill", "transparent");
+    }
     pathEl.setAttribute("data-name", name);
     pathEl.setAttribute("data-iso", iso);
     if (iso2) pathEl.setAttribute("data-iso2", iso2);
@@ -1473,9 +1745,95 @@ function initPlayerModal() {
 
 document.addEventListener("worldmedia-favorites-changed", refreshFavoriteStarsInList);
 
+/** Categories modal: open/close and populate list. By country / By categories header buttons. */
+function initViewMode() {
+  const byCountryBtn = document.getElementById("by-country-btn");
+  const byCategoriesBtn = document.getElementById("by-categories-btn");
+  const categoriesModal = document.getElementById("categories-modal");
+  const categoriesList = document.getElementById("categories-list");
+  const categoriesModalClose = document.getElementById("categories-modal-close");
+  const categoriesModalBackdrop = document.getElementById("categories-modal-backdrop");
+  const selectedCountryEl = document.getElementById("selected-country");
+  if (!byCountryBtn || !byCategoriesBtn || !categoriesModal || !categoriesList || !selectedCountryEl) return;
+
+  const categoriesSearchInput = document.getElementById("categories-search");
+  let categoriesCache = [];
+
+  function renderCategoryList(filter) {
+    const q = (filter || "").trim().toLowerCase();
+    categoriesList.innerHTML = "";
+    const toShow = q ? categoriesCache.filter((name) => name.toLowerCase().includes(q)) : categoriesCache;
+    toShow.forEach((name) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "category-btn";
+      btn.textContent = name;
+      btn.addEventListener("click", () => {
+        closeCategoriesModal();
+        selectedCountryEl.hidden = false;
+        loadChannelsForCategory(name);
+      });
+      const li = document.createElement("div");
+      li.className = "category-item";
+      li.appendChild(btn);
+      categoriesList.appendChild(li);
+    });
+  }
+
+  function openCategoriesModal() {
+    byCountryBtn.setAttribute("aria-pressed", "false");
+    byCategoriesBtn.setAttribute("aria-pressed", "true");
+    categoriesModal.hidden = false;
+    categoriesModal.setAttribute("aria-hidden", "false");
+    if (categoriesSearchInput) categoriesSearchInput.value = "";
+    categoriesList.innerHTML = "";
+    categoriesCache = [];
+    fetch("data/cat_channels/categories.json")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((arr) => {
+        if (!Array.isArray(arr)) return;
+        categoriesCache = arr;
+        renderCategoryList("");
+      })
+      .catch(() => {});
+  }
+
+  if (categoriesSearchInput) {
+    categoriesSearchInput.addEventListener("input", () => renderCategoryList(categoriesSearchInput.value));
+  }
+
+  function closeCategoriesModal() {
+    categoriesModal.hidden = true;
+    categoriesModal.setAttribute("aria-hidden", "true");
+  }
+
+  byCategoriesBtn.addEventListener("click", () => {
+    if (categoriesModal.hidden) openCategoriesModal();
+  });
+  byCountryBtn.addEventListener("click", () => {
+    byCountryBtn.setAttribute("aria-pressed", "true");
+    byCategoriesBtn.setAttribute("aria-pressed", "false");
+    if (!categoriesModal.hidden) closeCategoriesModal();
+  });
+  if (categoriesModalClose) {
+    categoriesModalClose.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeCategoriesModal();
+    });
+  }
+  if (categoriesModalBackdrop) {
+    categoriesModalBackdrop.addEventListener("click", closeCategoriesModal);
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && categoriesModal && !categoriesModal.hidden) closeCategoriesModal();
+  });
+}
+
 initMap();
 initPlayerModal();
 initFavoritesPanel();
+initViewMode();
 
 const filterTextEl = document.getElementById("filter-text");
 if (filterTextEl) filterTextEl.addEventListener("input", applyChannelFilters);

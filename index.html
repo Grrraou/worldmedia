@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WorldMedia — Pick a country</title>
+  <link rel="icon" href="assets/logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
@@ -12,17 +14,23 @@
 <body>
   <header class="header">
     <div class="header-inner">
-      <div>
-        <h1>WorldMedia</h1>
-        <p class="tagline">Pick a country to explore TV &amp; radio</p>
+      <div class="header-brand">
+        <img src="assets/logo.png" alt="" class="header-logo" width="40" height="40">
+        <div>
+          <h1>WorldMedia</h1>
+          <p class="tagline">Pick a country to explore TV &amp; radio</p>
+        </div>
       </div>
       <nav class="header-nav">
+        <button type="button" class="header-link header-link--mode" id="by-country-btn" aria-pressed="true">By country</button>
+        <button type="button" class="header-link header-link--mode" id="by-categories-btn" aria-pressed="false">By categories</button>
         <button type="button" class="header-link" id="favorites-toggle" aria-expanded="false" aria-controls="favorites-panel" aria-haspopup="true">Favorites</button>
         <button type="button" class="header-link" id="about-toggle" aria-expanded="false" aria-controls="about" aria-haspopup="true">About</button>
       </nav>
     </div>
     <section id="about" class="about about--hidden" aria-labelledby="about-heading" aria-hidden="true">
       <h2 id="about-heading">About</h2>
+      <p class="about-warning"><strong>Disclaimer:</strong> Media listed here are not checked by humans. Watch at your own risk. Many streams are blocked, geo-restricted, or may be offline. This site only aggregates public sources and does not verify availability or content.</p>
       <p>Map background: <a href="https://svs.gsfc.nasa.gov/2915" target="_blank" rel="noopener noreferrer">Blue Marble</a> (NASA/Goddard Space Flight Center Scientific Visualization Studio). Country boundaries © <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a> from the <a href="https://github.com/nvkelso/natural-earth-vector" target="_blank" rel="noopener noreferrer">natural-earth-vector</a> repository. Country flags from <a href="https://flagcdn.com/" target="_blank" rel="noopener noreferrer">Flagcdn</a> (ISO 3166-1 alpha-2). You can choose 110m, 50m, or 10m resolution in Map quality.</p>
     </section>
   </header>
@@ -46,7 +54,7 @@
   <main class="main">
     <aside class="sidebar">
       <div class="sidebar-content">
-        <p class="hint">Click a country on the map</p>
+        <p class="hint" id="sidebar-hint">Click a country on the map</p>
         <div id="selected-country" class="selected-country" aria-live="polite" hidden>
           <div class="selected-country-header">
             <img id="country-flag" class="country-flag" src="" alt="" width="80" height="60" hidden>
@@ -143,6 +151,7 @@
         </div>
         <button type="button" class="player-modal-close" id="player-modal-close" aria-label="Close">×</button>
       </div>
+      <div id="player-modal-seo" class="player-modal-seo" aria-live="polite"></div>
       <div class="player-modal-body">
         <div id="player-tv-wrap" class="player-wrap player-wrap--tv" hidden>
           <video id="player-video" class="player-video" controls playsinline preload="metadata"></video>
@@ -150,7 +159,30 @@
         <div id="player-radio-wrap" class="player-wrap player-wrap--radio" hidden>
           <audio id="player-audio" class="player-audio" controls preload="metadata"></audio>
         </div>
+        <div id="player-youtube-wrap" class="player-wrap player-wrap--youtube" hidden>
+          <iframe id="player-youtube-iframe" class="player-youtube-iframe" title="YouTube embed" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <div id="player-webcam-wrap" class="player-wrap player-wrap--webcam" hidden>
+          <img id="player-webcam-image" class="player-webcam-image" alt="Webcam stream" />
+          <iframe id="player-webcam-iframe" class="player-webcam-iframe" title="Webcam embed" allow="fullscreen" allowfullscreen hidden></iframe>
+        </div>
         <p id="player-error" class="player-error" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="categories-modal" class="categories-modal" role="dialog" aria-modal="true" aria-labelledby="categories-modal-title" aria-hidden="true" hidden>
+    <div class="categories-modal-backdrop" id="categories-modal-backdrop"></div>
+    <div class="categories-modal-dialog">
+      <div class="categories-modal-header">
+        <h2 id="categories-modal-title" class="categories-modal-title">By category</h2>
+        <button type="button" class="categories-modal-close" id="categories-modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="categories-modal-body">
+        <label for="categories-search" class="categories-search-label">Search categories</label>
+        <input type="search" id="categories-search" class="categories-search-input" placeholder="Search categories…" autocomplete="off" aria-describedby="categories-modal-hint" />
+        <p id="categories-modal-hint" class="categories-modal-hint">Select a category to browse channels</p>
+        <div id="categories-list" class="categories-list" role="list"></div>
       </div>
     </div>
   </div>

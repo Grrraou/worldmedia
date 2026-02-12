@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Import media channels from multiple sources.
 #
-# CONVENTION: The ONLY path format is data/channels/<country_code>/<sourcename>.json
-# (e.g. data/channels/FR/iptv-org.json). Parsers create only those files. This script
-# runs parsers and builds the global data/channels.json for the site (favorites catalog).
-# No other JSON files are created (no data/channels/FR.json etc.).
+# CONVENTION:
+# - Country channels: data/channels/<country_code>/<sourcename>.json
+# - Category channels: data/cat_channels/<categoryname>/<sourcename>.json (e.g. famelack-channels)
+# - Categories index: data/cat_channels/categories.json (list of category names)
+# This script runs parsers and builds data/channels.json from data/channels/ only (favorites catalog).
 #
 # Usage: ./import.sh [options] [script_name]
 #   No args: run all parsers.
@@ -17,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PARSERS_DIR="$SCRIPT_DIR/parsers"
 CHANNELS_DIR="$REPO_ROOT/data/channels"
+CAT_CHANNELS_DIR="$REPO_ROOT/data/cat_channels"
 OUT_FILE="$REPO_ROOT/data/channels.json"
 TMP_DIR="${TMPDIR:-/tmp}/worldmedia-import-$$"
 mkdir -p "$TMP_DIR"
@@ -53,13 +55,20 @@ clean_source_files() {
     rm -f "$f"
     count=$((count + 1))
   done < <(find "$CHANNELS_DIR" -mindepth 2 -maxdepth 2 -path "*/$name.json" -type f -print0 2>/dev/null)
+  # Also remove this source from cat_channels (e.g. famelack-channels)
+  if [[ -d "$CAT_CHANNELS_DIR" ]]; then
+    while IFS= read -r -d '' f; do
+      rm -f "$f"
+      count=$((count + 1))
+    done < <(find "$CAT_CHANNELS_DIR" -mindepth 2 -maxdepth 2 -path "*/$name.json" -type f -print0 2>/dev/null)
+  fi
   if [[ "$count" -gt 0 ]]; then
     echo "  -> removed $count files for source: $name"
   fi
 }
 
 ran=
-export CHANNELS_DIR
+export CHANNELS_DIR CAT_CHANNELS_DIR
 for parser in "$PARSERS_DIR"/*.sh; do
   [[ -x "$parser" ]] || continue
   name=$(basename "$parser" .sh)
