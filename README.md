@@ -12,33 +12,21 @@ The map uses an **equirectangular projection** (lat/lng → x/y) so the SVG is a
 
 ## Run locally
 
-Because the app fetches the GeoJSON from a URL, open it through a local server (not `file://`) to avoid CORS issues.
-
-### Docker
+The app must be served over HTTP (not `file://`) because it fetches GeoJSON from URLs. **Use Docker** so nginx serves the app and blocks access to `.env`, `scripts/`, and other sensitive paths.
 
 Port is read from `.env` (default `8080`). Copy the example and adjust if needed:
 
 ```bash
 cp .env.example .env
-# Edit .env to set PORT=8080 (or another port)
+# Optional: set PORT=8080 in .env
 make build
 make start
 # Open http://localhost:8080
 ```
 
-**Live editing:** use `make dev` instead of `make start` to mount the project directory into the container. Edit `index.html`, `styles.css`, or `app.js` on your machine and refresh the browser—no rebuild needed.
+**Live editing:** use `make dev` instead of `make start` to mount the project directory. Edit `index.html`, `styles.css`, or `app.js` and refresh the browser—no rebuild needed.
 
-### Without Docker
-
-```bash
-# Python
-python3 -m http.server 8080
-
-# Node (npx)
-npx serve .
-
-# Then open http://localhost:8080
-```
+**Why not Python / npx serve?** This repo does not use or need them. If you run `python3 -m http.server` or `npx serve` (or an IDE “Live Server”) on the project root, the whole directory is exposed and **http://localhost:8080/.env** will be downloadable. Use **only** `make start` or `make dev` (Docker + nginx) so nginx serves the app and returns 403 for `/.env`, `/scripts/`, etc. After changing `nginx.conf`, run `make rebuild` then `make start` or `make dev`.
 
 ## Import (channel data)
 
