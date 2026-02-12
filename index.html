@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorldMedia — Pick a country</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div>
+        <h1>WorldMedia</h1>
+        <p class="tagline">Pick a country to explore TV &amp; radio</p>
+      </div>
+      <nav class="header-nav">
+        <button type="button" class="header-link" id="favorites-toggle" aria-expanded="false" aria-controls="favorites-panel" aria-haspopup="true">Favorites</button>
+        <button type="button" class="header-link" id="about-toggle" aria-expanded="false" aria-controls="about" aria-haspopup="true">About</button>
+      </nav>
+    </div>
+    <section id="about" class="about about--hidden" aria-labelledby="about-heading" aria-hidden="true">
+      <h2 id="about-heading">About</h2>
+      <p>Map background: <a href="https://svs.gsfc.nasa.gov/2915" target="_blank" rel="noopener noreferrer">Blue Marble</a> (NASA/Goddard Space Flight Center Scientific Visualization Studio). Country boundaries © <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a> from the <a href="https://github.com/nvkelso/natural-earth-vector" target="_blank" rel="noopener noreferrer">natural-earth-vector</a> repository. Country flags from <a href="https://flagcdn.com/" target="_blank" rel="noopener noreferrer">Flagcdn</a> (ISO 3166-1 alpha-2). You can choose 110m, 50m, or 10m resolution in Map quality.</p>
+    </section>
+  </header>
+
+  <div id="favorites-panel" class="favorites-sidebar favorites-sidebar--closed" aria-labelledby="favorites-heading" aria-hidden="true">
+    <div class="favorites-sidebar-backdrop" id="favorites-sidebar-backdrop"></div>
+    <div class="favorites-sidebar-inner">
+      <div class="favorites-sidebar-header">
+        <h2 id="favorites-heading" class="favorites-heading">Favorites</h2>
+        <button type="button" class="favorites-sidebar-close" id="favorites-sidebar-close" aria-label="Close favorites">×</button>
+      </div>
+      <p class="favorites-hint">Add channels with the ★ button. Reorder with ↑↓. Create folders to organize.</p>
+      <div id="favorites-toolbar" class="favorites-toolbar">
+        <button type="button" class="favorites-btn" id="favorites-add-folder" title="Add folder">+ Folder</button>
+      </div>
+      <div id="favorites-list" class="favorites-list" role="list"></div>
+      <p id="favorites-empty" class="favorites-empty" hidden>No favorites yet. Select a country and click ★ on a channel.</p>
+    </div>
+  </div>
+
+  <main class="main">
+    <aside class="sidebar">
+      <div class="sidebar-content">
+        <p class="hint">Click a country on the map</p>
+        <div id="selected-country" class="selected-country" aria-live="polite" hidden>
+          <div class="selected-country-header">
+            <img id="country-flag" class="country-flag" src="" alt="" width="80" height="60" hidden>
+            <div class="selected-country-title">
+              <h2 id="country-name"></h2>
+              <p id="country-code" class="country-code"></p>
+              <p id="channels-debug-paths" class="channels-debug-paths" aria-live="polite" hidden></p>
+            </div>
+          </div>
+          <div id="channel-filters" class="channel-filters" hidden>
+            <div class="filter-group">
+              <span class="filter-group-label">Type</span>
+              <div id="filter-type" class="filter-toggles" role="group" aria-label="Filter by type"></div>
+            </div>
+            <div class="filter-group">
+              <span class="filter-group-label">Source</span>
+              <div id="filter-source" class="filter-toggles" role="group" aria-label="Filter by source"></div>
+            </div>
+            <div class="filter-group">
+              <label for="filter-text" class="filter-group-label">Search</label>
+              <input type="text" id="filter-text" class="filter-text-input" placeholder="Filter by name or source…" aria-label="Filter channels by name or source">
+            </div>
+          </div>
+          <div id="channels-loading" class="channels-loading" hidden>Loading channels…</div>
+          <div id="channels-empty" class="channels-empty" hidden>No channels for this country.</div>
+          <ul id="channel-list" class="channel-list" aria-label="Channels" hidden></ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="map-wrapper" id="map-wrapper">
+      <div class="map-controls" id="map-controls">
+        <div class="map-controls-row">
+          <label for="map-quality" class="map-controls-label">Quality</label>
+          <select id="map-quality" class="map-quality-select" aria-label="Map quality">
+            <option value="low">110m</option>
+            <option value="medium" selected>50m</option>
+            <option value="high">10m</option>
+          </select>
+        </div>
+        <div class="map-controls-row">
+          <label for="zoom-slider" class="map-controls-label">Zoom</label>
+          <div class="map-controls-zoom">
+            <input type="range" id="zoom-slider" class="zoom-slider" min="1" max="4" step="0.05" value="1" aria-label="Zoom level">
+            <output id="zoom-value" class="zoom-value" for="zoom-slider" aria-live="polite">100%</output>
+          </div>
+        </div>
+      </div>
+      <div class="map-container" id="map-container">
+        <div class="map-pan-zoom" id="map-pan-zoom">
+          <svg id="map" class="map-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet" aria-label="World map">
+            <defs>
+              <linearGradient id="ocean" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#0c1222" />
+                <stop offset="40%" stop-color="#0f172a" />
+                <stop offset="100%" stop-color="#1e293b" />
+              </linearGradient>
+              <filter id="country-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="1" stdDeviation="0.5" flood-opacity="0.15" />
+              </filter>
+              <filter id="country-hover" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="1" flood-opacity="0.2" />
+              </filter>
+              <!-- 30° grid: 1000/12 ≈ 83.33, 500/12 ≈ 41.67 -->
+              <pattern id="graticule" width="83.33" height="41.67" patternUnits="userSpaceOnUse">
+                <path d="M 0 0 v 41.67 M 83.33 0 v 41.67" fill="none" stroke="rgba(148,163,184,0.07)" stroke-width="0.2" />
+                <path d="M 0 0 h 83.33 M 0 41.67 h 83.33" fill="none" stroke="rgba(148,163,184,0.07)" stroke-width="0.2" />
+              </pattern>
+            </defs>
+            <image class="map-bg-image" href="assets/map-bg.png" x="0" y="0" width="1000" height="500" preserveAspectRatio="xMidYMid meet" aria-hidden="true" />
+            <rect class="map-bg-overlay" width="100%" height="100%" fill="#0c1222" opacity="0.42" aria-hidden="true" />
+            <rect class="ocean-overlay" width="100%" height="100%" fill="url(#graticule)" />
+            <g id="countries" aria-hidden="true"></g>
+          </svg>
+        </div>
+        <div id="map-loading" class="map-loading">Loading map…</div>
+        <div id="map-tooltip" class="map-tooltip" role="tooltip" aria-hidden="true" aria-live="polite"></div>
+      </div>
+      <button type="button" id="map-unknown-btn" class="map-unknown-btn" aria-label="Show channels from unknown countries">Unknown</button>
+    </div>
+  </main>
+
+  <div id="player-modal" class="player-modal" role="dialog" aria-modal="true" aria-labelledby="player-modal-title" aria-hidden="true" hidden>
+    <div class="player-modal-backdrop" id="player-modal-backdrop"></div>
+    <div class="player-modal-dialog">
+      <div class="player-modal-header">
+        <div class="player-modal-title-block">
+          <div class="player-modal-title-row">
+            <img id="player-modal-logo" class="player-modal-logo" src="" alt="" width="40" height="30" hidden>
+            <h2 id="player-modal-title" class="player-modal-title"></h2>
+            <button type="button" class="player-modal-fav" id="player-modal-fav" aria-label="Add to favorites" title="Add to favorites">★</button>
+          </div>
+          <a id="player-modal-source" class="player-modal-source" href="#" target="_blank" rel="noopener noreferrer" hidden>Source</a>
+        </div>
+        <button type="button" class="player-modal-close" id="player-modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="player-modal-body">
+        <div id="player-tv-wrap" class="player-wrap player-wrap--tv" hidden>
+          <video id="player-video" class="player-video" controls playsinline preload="metadata"></video>
+        </div>
+        <div id="player-radio-wrap" class="player-wrap player-wrap--radio" hidden>
+          <audio id="player-audio" class="player-audio" controls preload="metadata"></audio>
+        </div>
+        <p id="player-error" class="player-error" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
+  <script src="app.js"></script>
+</body>
+</html>
