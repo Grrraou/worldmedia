@@ -24,6 +24,7 @@
       <nav class="header-nav">
         <button type="button" class="header-link header-link--mode" id="by-country-btn" aria-pressed="true">By country</button>
         <button type="button" class="header-link header-link--mode" id="by-categories-btn" aria-pressed="false">By categories</button>
+        <button type="button" class="header-link" id="trash-toggle" aria-expanded="false" aria-controls="trash-panel" aria-haspopup="true">Trash</button>
         <button type="button" class="header-link" id="favorites-toggle" aria-expanded="false" aria-controls="favorites-panel" aria-haspopup="true">Favorites</button>
         <button type="button" class="header-link" id="about-toggle" aria-expanded="false" aria-controls="about" aria-haspopup="true">About</button>
       </nav>
@@ -48,6 +49,22 @@
       </div>
       <div id="favorites-list" class="favorites-list" role="list"></div>
       <p id="favorites-empty" class="favorites-empty" hidden>No favorites yet. Select a country and click ★ on a channel.</p>
+    </div>
+  </div>
+
+  <div id="trash-panel" class="trash-sidebar favorites-sidebar favorites-sidebar--closed" aria-labelledby="trash-heading" aria-hidden="true">
+    <div class="trash-sidebar-backdrop favorites-sidebar-backdrop" id="trash-sidebar-backdrop"></div>
+    <div class="trash-sidebar-inner favorites-sidebar-inner">
+      <div class="trash-sidebar-header favorites-sidebar-header">
+        <h2 id="trash-heading" class="favorites-heading">Trash</h2>
+        <button type="button" class="favorites-sidebar-close" id="trash-sidebar-close" aria-label="Close trash">×</button>
+      </div>
+      <p class="trash-hint favorites-hint">Channels in trash are hidden from country and category lists. Restore to see them again.</p>
+      <div id="trash-toolbar" class="favorites-toolbar">
+        <button type="button" class="favorites-btn" id="trash-empty-btn" title="Empty trash">Empty trash</button>
+      </div>
+      <div id="trash-list" class="favorites-list" role="list"></div>
+      <p id="trash-empty" class="favorites-empty" hidden>Trash is empty.</p>
     </div>
   </div>
 
@@ -146,6 +163,7 @@
             <img id="player-modal-logo" class="player-modal-logo" src="" alt="" width="40" height="30" hidden>
             <h2 id="player-modal-title" class="player-modal-title"></h2>
             <button type="button" class="player-modal-fav" id="player-modal-fav" aria-label="Add to favorites" title="Add to favorites">★</button>
+            <button type="button" class="player-modal-trash" id="player-modal-trash" aria-label="Add to trash" title="Add to trash">🗑</button>
           </div>
           <a id="player-modal-source" class="player-modal-source" href="#" target="_blank" rel="noopener noreferrer" hidden>Source</a>
         </div>

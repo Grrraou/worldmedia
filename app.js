@@ -376,6 +376,54 @@ function getFavoriteFolders() {
   return folders;
 }
 
+// —— Trash (localStorage): hide channels from lists, no folders ——
+const TRASH_STORAGE_KEY = "worldmedia-trash";
+
+function getTrash() {
+  try {
+    const raw = localStorage.getItem(TRASH_STORAGE_KEY);
+    const list = raw ? JSON.parse(raw) : null;
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function setTrash(list) {
+  const payload = Array.isArray(list) ? list : [];
+  try {
+    localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(payload));
+  } catch (_) {}
+  dispatchEvent(new CustomEvent("worldmedia-trash-changed"));
+}
+
+function isChannelInTrash(iso, slug) {
+  const list = getTrash();
+  const normIso = (iso || "").toUpperCase();
+  const normSlug = (slug || "").toLowerCase();
+  return list.some((e) => (e.iso || "").toUpperCase() === normIso && (e.slug || "").toLowerCase() === normSlug);
+}
+
+function addChannelToTrash(ch) {
+  const iso = (ch.iso || "").toUpperCase();
+  const slug = channelSlug(ch);
+  if (isChannelInTrash(iso, slug)) return;
+  const list = getTrash();
+  list.push({ iso, slug, name: ch.name || "Channel" });
+  setTrash(list);
+}
+
+function removeChannelFromTrash(iso, slug) {
+  const list = getTrash().filter(
+    (e) => (e.iso || "").toUpperCase() !== (iso || "").toUpperCase() || (e.slug || "").toLowerCase() !== (slug || "").toLowerCase()
+  );
+  setTrash(list);
+}
+
+function emptyTrash() {
+  setTrash([]);
+}
+
 function moveFavoriteUpDown(itemId, dir) {
   const data = getFavorites();
   function flatWithPath(items, pathPrefix) {
@@ -433,6 +481,8 @@ function openPlayerModal(channel) {
     errorEl.hidden = true;
     errorEl.textContent = "";
   }
+  const trashBtnEl = document.getElementById("player-modal-trash");
+  if (trashBtnEl) trashBtnEl.hidden = true;
 
   const titleEl = document.getElementById("player-modal-title");
   const logoEl = document.getElementById("player-modal-logo");
@@ -591,10 +641,10 @@ function openPlayerModal(channel) {
     }
   }
 
+  const iso = (channel.iso || "").toUpperCase();
+  const slug = channelSlug(channel);
   const favBtn = document.getElementById("player-modal-fav");
   if (favBtn) {
-    const iso = (channel.iso || "").toUpperCase();
-    const slug = channelSlug(channel);
     const updateFavBtn = () => {
       const inFav = isChannelInFavorites(iso, slug);
       favBtn.classList.toggle("is-favorite", inFav);
@@ -608,6 +658,29 @@ function openPlayerModal(channel) {
       if (isChannelInFavorites(iso, slug)) removeChannelFromFavorites(iso, slug);
       else addChannelToFavorites(channel);
       updateFavBtn();
+    };
+  }
+
+  const trashBtn = document.getElementById("player-modal-trash");
+  if (trashBtn) {
+    const inTrash = isChannelInTrash(iso, slug);
+    trashBtn.hidden = false;
+    trashBtn.classList.toggle("in-trash", inTrash);
+    trashBtn.setAttribute("aria-label", inTrash ? "Remove from trash" : "Add to trash");
+    trashBtn.title = inTrash ? "Remove from trash" : "Add to trash";
+    trashBtn.textContent = "🗑";
+    trashBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isChannelInTrash(iso, slug)) {
+        removeChannelFromTrash(iso, slug);
+        trashBtn.classList.remove("in-trash");
+        trashBtn.setAttribute("aria-label", "Add to trash");
+        trashBtn.title = "Add to trash";
+      } else {
+        addChannelToTrash(channel);
+        closePlayerModal();
+      }
     };
   }
 
@@ -832,7 +905,7 @@ async function loadChannelsForCountry(countryCode, onChannelsLoaded) {
         }
       }
     }
-    const channels = allChannels;
+    const channels = allChannels.filter((ch) => !isChannelInTrash((ch.iso || "").toUpperCase(), channelSlug(ch)));
     loadingEl.hidden = true;
     if (channels.length === 0) {
       emptyEl.hidden = false;
@@ -980,7 +1053,7 @@ async function loadChannelsForCategory(categoryName, onChannelsLoaded) {
         } else if (!u) allChannels.push(ch);
       }
     }
-    const channels = allChannels;
+    const channels = allChannels.filter((ch) => !isChannelInTrash((ch.iso || "").toUpperCase(), channelSlug(ch)));
     loadingEl.hidden = true;
     if (channels.length === 0) {
       emptyEl.hidden = false;
@@ -1745,6 +1818,95 @@ function initPlayerModal() {
 
 document.addEventListener("worldmedia-favorites-changed", refreshFavoriteStarsInList);
 
+function refreshChannelsAfterTrashChange() {
+  const selectedCountryEl = document.getElementById("selected-country");
+  const countryNameEl = document.getElementById("country-name");
+  const countryCodeEl = document.getElementById("country-code");
+  if (!selectedCountryEl || selectedCountryEl.hidden) return;
+  if (countryCodeEl && countryCodeEl.textContent === "Category" && countryNameEl) {
+    loadChannelsForCategory(countryNameEl.textContent.trim());
+  } else {
+    const { country } = getUrlState();
+    if (country) loadChannelsForCountry(country);
+    else {
+      const sel = document.querySelector(".country.selected");
+      if (sel) loadChannelsForCountry(sel.getAttribute("data-iso2") || "");
+      else loadChannelsForCountry(UNKNOWN_COUNTRY_ISO);
+    }
+  }
+}
+
+document.addEventListener("worldmedia-trash-changed", () => {
+  refreshChannelsAfterTrashChange();
+});
+
+/** Trash panel: list trashed channels, Restore and Empty trash. */
+function initTrashPanel() {
+  const toggle = document.getElementById("trash-toggle");
+  const panel = document.getElementById("trash-panel");
+  const listEl = document.getElementById("trash-list");
+  const emptyEl = document.getElementById("trash-empty");
+  const emptyBtn = document.getElementById("trash-empty-btn");
+  const backdrop = document.getElementById("trash-sidebar-backdrop");
+  const closeBtn = document.getElementById("trash-sidebar-close");
+  if (!toggle || !panel || !listEl) return;
+
+  function openPanel() {
+    panel.classList.remove("favorites-sidebar--closed");
+    panel.setAttribute("aria-hidden", "false");
+    toggle.setAttribute("aria-expanded", "true");
+    renderTrashList();
+  }
+
+  function closePanel() {
+    panel.classList.add("favorites-sidebar--closed");
+    panel.setAttribute("aria-hidden", "true");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
+  function renderTrashList() {
+    const list = getTrash();
+    emptyEl.hidden = list.length > 0;
+    listEl.innerHTML = "";
+    list.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "favorites-row favorites-row--channel trash-row";
+      const main = document.createElement("div");
+      main.className = "favorites-row-main";
+      main.textContent = entry.name || "Channel";
+      const meta = document.createElement("span");
+      meta.className = "favorites-row-meta";
+      meta.textContent = entry.iso || "";
+      const restoreBtn = document.createElement("button");
+      restoreBtn.type = "button";
+      restoreBtn.className = "favorites-play";
+      restoreBtn.textContent = "Restore";
+      restoreBtn.title = "Remove from trash and show in lists again";
+      restoreBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        removeChannelFromTrash(entry.iso, entry.slug);
+        renderTrashList();
+      });
+      row.append(main, meta, restoreBtn);
+      listEl.appendChild(row);
+    });
+  }
+
+  toggle.addEventListener("click", () => {
+    if (panel.classList.contains("favorites-sidebar--closed")) openPanel();
+    else closePanel();
+  });
+  backdrop?.addEventListener("click", closePanel);
+  closeBtn?.addEventListener("click", closePanel);
+  emptyBtn?.addEventListener("click", () => {
+    emptyTrash();
+    renderTrashList();
+  });
+  addEventListener("worldmedia-trash-changed", () => {
+    if (!panel.classList.contains("favorites-sidebar--closed")) renderTrashList();
+  });
+}
+
 /** Categories modal: open/close and populate list. By country / By categories header buttons. */
 function initViewMode() {
   const byCountryBtn = document.getElementById("by-country-btn");
@@ -1833,6 +1995,7 @@ function initViewMode() {
 initMap();
 initPlayerModal();
 initFavoritesPanel();
+initTrashPanel();
 initViewMode();
 
 const filterTextEl = document.getElementById("filter-text");

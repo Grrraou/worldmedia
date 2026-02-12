@@ -1292,6 +1292,36 @@ body {
   outline-offset: 2px;
 }
 
+.player-modal-trash {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.player-modal-trash:hover {
+  color: var(--text);
+}
+
+.player-modal-trash.in-trash {
+  color: var(--accent);
+}
+
+.player-modal-trash:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .player-modal-source {
   font-size: 0.8rem;
   color: var(--accent);
